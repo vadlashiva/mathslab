@@ -72,3 +72,11 @@ canvas.plot { display: block; width: 100%; max-width: 680px; margin: 10px 0; bor
   .main { padding: 16px 14px 50px; }
   h1 { font-size: 22px; }
 }
+.ask { border-color: #c7d2fe; box-shadow: 0 6px 24px rgba(67, 56, 202, .08); }
+.ask textarea { font-size: 16px; }
+.chips { margin-top: 12px; font-size: 13px; color: var(--dim); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font: 13px ui-monospace, Consolas, monospace; color: var(--ink); cursor: pointer; text-align: left; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.qHead { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.qHead code { font-size: 14px; white-space: pre-wrap; }
+.steps .actions { margin-top: 8px; }

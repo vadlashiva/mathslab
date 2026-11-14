@@ -9,15 +9,36 @@
 
   function sidebar(active) {
     const part = (label, list) => `<div class="sideHead">${label}</div>` + list.map((c) => `<a href="#/${c.id}" class="${c.id === active ? "on" : ""}"><span class="no">${c.n}</span><span>${esc(c.title)}</span></a>`).join("");
-    side.innerHTML = `<a href="#/" class="${active ? "" : "on"}"><span class="no">⌂</span><span>All chapters</span></a>` + part("Part I", ML.chapters.filter((c) => c.n <= 6)) + part("Part II", ML.chapters.filter((c) => c.n > 6));
+    side.innerHTML = `<a href="#/" class="${active ? "" : "on"}"><span class="no">⌂</span><span>Ask a question</span></a>` + part("Part I", ML.chapters.filter((c) => c.n <= 6)) + part("Part II", ML.chapters.filter((c) => c.n > 6));
   }
   function home() {
     const cards = (list) => `<div class="grid">${list.map((c) => `<a class="chCard" href="#/${c.id}"><span class="chNo">Chapter ${c.n}</span><b>${esc(c.title)}</b><small>${c.tools.map((t) => esc(t.title)).join(" · ")}</small></a>`).join("")}</div>`;
+    const EX = ["∫ x^2 e^x dx", "Integrate sin 2x – 4 e^3x", "Differentiate x^2 sin(3x)", "∫ 1/(x^2 - 9) dx", "Integrate x^2 from 2 to 3", "Maximise Z = 4x + y subject to x + y ≤ 50, 3x + y ≤ 90, x ≥ 0, y ≥ 0"];
     main.innerHTML = `<h1>II PUC Mathematics, solved step by step</h1>
-      <p class="lead">Pick a chapter, type your own question, and see every step of the working. All ${ML.chapters.reduce((s, c) => s + c.tools.length, 0)} solvers run in your browser.</p>
+      <p class="lead">Paste or type a question below, or pick a chapter. All ${ML.chapters.reduce((s, c) => s + c.tools.length, 0)} solvers run in your browser.</p>
+      <div class="card ask"><h2>Ask a question</h2><p class="desc">Type or paste a question and press Solve. Several questions can go in together, one per line.</p>
+        <form id="askForm"><textarea id="askBox" rows="4" spellcheck="false" placeholder="For example:  ∫ (4 e^3x + 1) dx     or     Differentiate x^2 sin(3x)"></textarea>
+        <div class="actions"><button class="btn" type="submit">Solve</button><button class="btn ghost" type="button" id="askClear">Clear</button></div></form>
+        <div class="chips">Try: ${EX.map((e) => `<button type="button" class="chip">${esc(e)}</button>`).join("")}</div>
+        <details class="help"><summary>Tips for pasting from a PDF</summary><p>Copying from the textbook PDF usually loses powers and fractions: $e^{3x}$ arrives as <code>e3x</code> or just <code>e</code>, and a fraction arrives as scattered lines. After pasting, check the line that starts with <b>Read as</b>. If it is not your question, fix the text: write powers with <code>^</code> (<code>x^2</code>, <code>e^(3x)</code>) and fractions with <code>/</code> and brackets, like <code>(x^3 + 5x^2 - 4)/x^2</code>.</p></details></div>
+      <div id="askOut"></div>
       <h2>Part I</h2><p class="lead">Chapters 1 to 6</p>${cards(ML.chapters.filter((c) => c.n <= 6))}
       <h2>Part II</h2><p class="lead">Chapters 7 to 13, arranged by the sections of the Part II textbook</p>${cards(ML.chapters.filter((c) => c.n > 6))}
       <p class="foot">MathsLab shows the method along with the answer. Write the steps in your own words in the exam, and check any answer that looks unusual with your teacher.</p>`;
+  }
+  function ask() {
+    const box = document.getElementById("askBox"), out = document.getElementById("askOut"), qs = ML.splitQuestions(box.value);
+    out.innerHTML = ""; ML.pending.length = 0;
+    if (!qs.length) { out.innerHTML = `<div class="card"><div class="error">Type or paste a question first.</div></div>`; return; }
+    qs.forEach((q, i) => {
+      const card = document.createElement("div"); card.className = "card";
+      card.innerHTML = `<div class="qHead">${qs.length > 1 ? `<span class="stepNo">Question ${i + 1}</span> ` : ""}<code>${esc(q.text.length > 160 ? q.text.slice(0, 160) + "…" : q.text)}</code></div>`;
+      try { card.appendChild(ML.answerQuestion(q).el); }
+      catch (e) { const d = document.createElement("div"); d.className = "error"; d.innerHTML = e && e.constructor === Error ? ML.rich(esc(e.message)) : "I could not work this one out. Check the line that I read, fix the typing and try again."; card.appendChild(d); if (!(e && e.constructor === Error)) console.error(e); }
+      out.appendChild(card);
+    });
+    ML.pending.splice(0).forEach((fn) => fn());
+    out.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function fieldHtml(f) {
     const id = `f_${f.id}`, wide = f.type === "area" || f.wide ? " wide" : "";
@@ -54,11 +75,18 @@
     main.querySelectorAll("input[type=text]").forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); solve(tool); } }));
     solve(tool);
   }
+  function wireAsk() {
+    const form = document.getElementById("askForm"); if (!form) return;
+    form.addEventListener("submit", (e) => { e.preventDefault(); ask(); });
+    document.getElementById("askClear").addEventListener("click", () => { document.getElementById("askBox").value = ""; document.getElementById("askOut").innerHTML = ""; document.getElementById("askBox").focus(); });
+    main.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { document.getElementById("askBox").value = c.textContent; ask(); }));
+    main.querySelectorAll(".ask .help").forEach((d) => (d.innerHTML = ML.rich(d.innerHTML)));
+  }
   function route() {
     const [, chId, toolId] = location.hash.split("/");
     const ch = ML.chapters.find((c) => c.id === chId);
     sidebar(ch && ch.id); side.classList.remove("open");
-    if (ch) chapter(ch, toolId); else home();
+    if (ch) chapter(ch, toolId); else { home(); wireAsk(); }
     window.scrollTo(0, 0);
   }
   document.getElementById("menuBtn").addEventListener("click", () => side.classList.toggle("open"));

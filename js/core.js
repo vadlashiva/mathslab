@@ -54,7 +54,7 @@
       return undefined;
     },
   };
-  ML.tex = (x) => tidy(typeof x === "string" ? ML.parse(x) : x).toTex(texOpts).replace(/~/g, "\\,").replace(/\\cdot/g, "\\,").replace(/\+\s*-/g, "-");
+  ML.tex = (x) => tidy(typeof x === "string" ? ML.parse(x) : x).toTex(texOpts).replace(/(\d)\\cdot(\d)/g, "$1\\times $2").replace(/\\mathrm\{([a-z])\}/g, "$1").replace(/~/g, "\\,").replace(/\\cdot/g, "\\,").replace(/\+\s*-/g, "-");
   // simplify, then turn decimals the simplifier produced (0.6931..., 1.7320...) back into log(2), sqrt(3), pi/2
   const exactConst = (n) => n.transform((k) => {
     if (!k.isConstantNode || typeof k.value !== "number" || fracApprox(k.value, 1000)) return k;
@@ -68,6 +68,12 @@
   ML.fn = (x, v = "x") => {
     const c = (typeof x === "string" ? ML.parse(x) : x).compile();
     return (val) => { try { const r = c.evaluate({ [v]: val }); return typeof r === "number" ? r : NaN; } catch (e) { return NaN; } };
+  };
+  // like ML.fn, but other letters (a, b, c, k ...) are treated as constants with fixed sample values
+  ML.fnSym = (x, v = "x") => {
+    const node = typeof x === "string" ? ML.parse(x) : x, c = node.compile(), scope = {};
+    node.filter((n) => n.isSymbolNode && n.name !== v && typeof math[n.name] === "undefined").forEach((n) => (scope[n.name] = 0.83 + (n.name.charCodeAt(0) % 11) * 0.29));
+    return (val) => { try { const r = c.evaluate({ ...scope, [v]: val }); return typeof r === "number" ? r : NaN; } catch (e) { return NaN; } };
   };
   ML.fn2 = (x) => { const c = (typeof x === "string" ? ML.parse(x) : x).compile(); return (xv, yv) => { try { const r = c.evaluate({ x: xv, y: yv }); return typeof r === "number" ? r : NaN; } catch (e) { return NaN; } }; };
   ML.val = (s) => { const r = ML.parse(s).compile().evaluate({}); if (typeof r !== "number" || !isFinite(r)) throw new Error(`"${s}" is not a number I can use here.`); return r; };
@@ -242,7 +248,7 @@
   };
   const pval = (p, x) => p.reduceRight((s, c) => s * x + c, 0);
   const verify = (Fnode, f, v) => {
-    const F = ML.fn(Fnode, v); let ok = 0, tried = 0;
+    const F = ML.fnSym(Fnode, v); let ok = 0, tried = 0;
     for (const t of [0.37, 0.71, 1.13, 1.9, 2.6, 3.7, 5.2, -0.43, -1.27, -3.1]) {
       const h = 1e-5, dF = (F(t + h) - F(t - h)) / (2 * h), ft = f(t);
       if (!isFinite(dF) || !isFinite(ft)) continue;
@@ -298,6 +304,19 @@
     if (!P) return null;
     if (dsq) { const Q = ML.poly(dsq, v); if (Q && Q.length === 3 && P.length === 1) { const s = quadForms("invsqrt", Q, v); return s && { str: `(${ML.numStr(P[0])})*(${s})`, method: "Integral of a particular form (§7.4)", formula: FORM.invsqrt }; } return null; }
     const Q = ML.poly(den, v);
+    if (Q && Q.length >= 2 && P.length >= Q.length) {
+      // improper fraction: divide first
+      const r = P.slice(), q = new Array(P.length - Q.length + 1).fill(0);
+      for (let i = q.length - 1; i >= 0; i--) { q[i] = r[i + Q.length - 1] / Q[Q.length - 1]; Q.forEach((c, j) => (r[i + j] -= q[i] * c)); }
+      const ps = (p) => p.map((c, i) => (Math.abs(c) < 1e-12 ? null : `(${ML.numStr(c)})${i ? `*${v}^${i}` : ""}`)).filter(Boolean).join(" + ") || "0";
+      let str = q.map((c, i) => (Math.abs(c) < 1e-12 ? null : `(${ML.numStr(c / (i + 1))})*${v}^${i + 1}`)).filter(Boolean).join(" + ") || "0";
+      const rem = r.slice(0, Q.length - 1);
+      if (rem.some((c) => Math.abs(c) > 1e-9)) {
+        if (Q.length === 2) str += ` + (${ML.numStr(rem[0] / Q[1])})*log(abs(${den}))`;
+        else { const rest = special(math.parse(`(${ps(rem)})/(${den})`), v); if (!rest) return null; str += ` + (${rest.str})`; }
+      }
+      return { str, method: "Divide the numerator by the denominator first (§7.2)", formula: `${ML.tex(node)} = ${ML.tex(ps(q))}${rem.some((c) => Math.abs(c) > 1e-9) ? ` + \\dfrac{${ML.tex(ps(rem))}}{${ML.tex(den)}}` : ""}` };
+    }
     if (!Q || Q.length < 3 || P.length >= Q.length) return null;
     const deg = Q.length - 1, dQ = Q.slice(1).map((c, i) => c * (i + 1)), roots = ML.roots((x) => pval(Q, x), -60, 60, 6000);
     if (roots.length === deg && roots.every((r) => fracApprox(r, 64))) {
@@ -334,9 +353,27 @@
     }
     return null;
   }
+  const TRIGRULES = ["sin(n)/cos(n) -> tan(n)", "cos(n)/sin(n) -> cot(n)", "n1/cos(n)^n2 -> n1*sec(n)^n2", "n1/sin(n)^n2 -> n1*csc(n)^n2", "n1/sec(n)^n2 -> n1*cos(n)^n2", "n1/csc(n)^n2 -> n1*sin(n)^n2", "n1/cos(n) -> n1*sec(n)", "n1/sin(n) -> n1*csc(n)", "n1/sec(n) -> n1*cos(n)", "n1/csc(n) -> n1*sin(n)",
+    "sec(n)^2*sin(n)^2 -> tan(n)^2", "sin(n)^2*sec(n)^2 -> tan(n)^2", "csc(n)^2*cos(n)^2 -> cot(n)^2", "cos(n)^2*csc(n)^2 -> cot(n)^2", "sin(n)*sec(n)^2 -> sec(n)*tan(n)", "sec(n)^2*sin(n) -> sec(n)*tan(n)", "cos(n)*csc(n)^2 -> csc(n)*cot(n)", "csc(n)^2*cos(n) -> csc(n)*cot(n)", "sin(n)*sec(n) -> tan(n)", "cos(n)*csc(n) -> cot(n)",
+    "tan(n)^2 -> sec(n)^2 - 1", "cot(n)^2 -> csc(n)^2 - 1"];
+  const flat = (n, sign = 1, out = []) => { n = unwrap(n); if (n.isOperatorNode && n.fn === "add") { flat(n.args[0], sign, out); flat(n.args[1], sign, out); } else if (n.isOperatorNode && n.fn === "subtract") { flat(n.args[0], sign, out); flat(n.args[1], -sign, out); } else out.push(`${sign < 0 ? "-" : ""}(${n})`); return out; };
+  const isSum = (n) => { n = unwrap(n); return n.isOperatorNode && (n.fn === "add" || n.fn === "subtract"); };
+  // the textbook's first move for many integrands: multiply out or divide through, then integrate each term
+  function termwise(node, v, depth) {
+    const n = unwrap(node); let parts = null;
+    if (n.isOperatorNode && n.fn === "divide" && isSum(n.args[0])) parts = flat(n.args[0]).map((t) => `(${t})/(${n.args[1]})`);
+    else if (n.isOperatorNode && n.fn === "multiply" && (isSum(n.args[0]) || isSum(n.args[1]))) { const [s, o] = isSum(n.args[0]) ? n.args : [n.args[1], n.args[0]]; parts = flat(s).map((t) => `(${t})*(${o})`); }
+    else if (n.isOperatorNode && n.fn === "pow" && isSum(n.args[0]) && n.args[1].toString() === "2") { const t = flat(n.args[0]); if (t.length === 2) parts = [`(${t[0]})^2`, `2*(${t[0]})*(${t[1]})`, `(${t[1]})^2`]; }
+    else if (isSum(n)) parts = flat(n);
+    else { const t = math.simplify(n, TRIGRULES); if (t.toString() !== n.toString()) parts = isSum(t) ? flat(t) : [t.toString()]; }
+    if (!parts) return null;
+    const res = [];
+    for (const p of parts) { let t = math.simplify(p); try { t = math.simplify(t, TRIGRULES); } catch (e) { /* keep */ } const r = ML.integrate(t, v, depth + 1); if (!r) return null; res.push(`(${r.str})`); }
+    return { raw: true, str: res.join(" + "), method: "Simplify the integrand, then integrate term by term (§7.2)", formula: `${ML.tex(node)} = ${parts.map((p) => { let t = math.simplify(p); try { t = math.simplify(t, TRIGRULES); } catch (e) { /* keep */ } return ML.tex(t); }).join(" + ").replace(/\+ -/g, "- ")}` };
+  }
   // Antiderivative: textbook forms first, then the symbolic engine. Every result is checked by differentiating. Returns null when no closed form is found.
-  ML.integrate = (x, v = "x") => {
-    const node = typeof x === "string" ? ML.parse(x) : x, s = node.toString(), f = ML.fn(node, v);
+  ML.integrate = (x, v = "x", depth = 0) => {
+    const node = typeof x === "string" ? ML.parse(x) : x, s = node.toString(), f = ML.fnSym(node, v);
     try {
       for (const sp of [special(node, v), substitution(node, v)]) {
         if (!sp || !sp.str) continue;
@@ -347,10 +384,16 @@
     } catch (e) { /* fall through to the general engine */ }
     try {
       const r = nerdamer(`integrate(${s}, ${v})`).toString();
-      if (/integrate|undefined|NaN|\bi\b|asinh|acosh|atanh|erf|Si|Ci|Ei/.test(r)) return null;
-      const F = math.parse(r);
-      return verify(F, f, v) ? { node: F, str: r } : null;
-    } catch (e) { return null; }
+      if (!/integrate|undefined|NaN|\bi\b|asinh|acosh|atanh|erf|Si|Ci|Ei|atan\(tan|tan\(\(1\/2\)/.test(r) && r.length < 160) {
+        const F = math.parse(r);
+        if (verify(F, f, v)) return { node: F, str: r };
+      }
+    } catch (e) { /* try the term-by-term route */ }
+    if (depth < 2) try {
+      const tw = termwise(node, v, depth);
+      if (tw) { const F = math.parse(tw.str); if (verify(F, f, v)) return { node: F, str: F.toString(), method: tw.method, formula: tw.formula }; }
+    } catch (e) { /* no closed form found */ }
+    return null;
   };
   ML.simpson = (f, a, b, n = 2000) => {
     const h = (b - a) / n; let s = f(a) + f(b);
