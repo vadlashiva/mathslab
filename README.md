@@ -25,13 +25,21 @@ Open `index.html` in a browser. There is nothing to install or build, and it wor
 12. Linear Programming: graphical (corner point) method with the feasible region drawn
 13. Probability: conditional probability, Bayes' theorem, random variables, binomial distribution
 
+## Asking by photo
+
+The Ask box on the first page accepts a photo, a dropped picture or a pasted screenshot of a question.
+
+- **Built-in reader (free):** works on the hosted site with no setup. It reads plain printed lines well, but powers, roots and fractions usually need correcting before solving.
+- **AI reader (optional):** `api/read-photo.js` is a Vercel serverless function that sends the photo to an AI model and returns the question as text. To switch it on, import this repository into Vercel and add the environment variable `ANTHROPIC_API_KEY`. The app detects the function by itself and falls back to the built-in reader when it is missing. Each photo costs a small amount on that key, so set a spending limit on it.
+
 ## How it is built
 
 Plain HTML, CSS and JavaScript.
 
 - `js/core.js`: parsing, exact fractions, the step-by-step differentiator, integration, plotting
 - `js/chapters/`: one file per group of chapters; each solver is a small object with its input fields and a `solve` function
+- `js/ask.js` and `js/photo.js`: the Ask box (reading typed, pasted and photographed questions)
 - `js/app.js`: the page shell and navigation
-- `vendor/`: [math.js](https://mathjs.org) (Apache-2.0), [nerdamer](https://github.com/jiggzson/nerdamer) (Apache-2.0) and [KaTeX](https://katex.org) (MIT)
+- `vendor/`: [math.js](https://mathjs.org) (Apache-2.0), [nerdamer](https://github.com/jiggzson/nerdamer) (Apache-2.0) and [KaTeX](https://katex.org) (MIT), [Tesseract.js](https://github.com/naptha/tesseract.js) (Apache-2.0)
 
 To add a solver, push another entry into the `tools` list of its chapter.
