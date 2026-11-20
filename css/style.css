@@ -84,3 +84,6 @@ canvas.plot { display: block; width: 100%; max-width: 680px; margin: 10px 0; bor
 .photoRow { display: flex; gap: 12px; align-items: center; margin-top: 12px; padding: 10px 12px; border: 1px dashed #c7d2fe; border-radius: 10px; background: var(--accent-soft); font-size: 14px; }
 .photoRow[hidden] { display: none; }
 .photoRow img { max-height: 64px; max-width: 220px; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
+
+/* the camera button only makes sense on phones and tablets */
+@media (hover: hover) and (pointer: fine) { .camBtn { display: none; } }

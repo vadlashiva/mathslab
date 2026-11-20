@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MathsLab – II PUC Mathematics Solver</title>
 <meta name="description" content="Step-by-step solvers for every chapter of II PUC (Class 12) Mathematics: matrices, calculus, vectors, 3D geometry, linear programming and probability.">
+<meta name="theme-color" content="#1d4ed8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="vendor/katex/katex.min.css">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -30,5 +35,6 @@
 <script src="js/ask.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/app.js"></script>
+<script>if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>
