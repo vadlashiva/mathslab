@@ -18,7 +18,7 @@
       <p class="lead">Paste or type a question below, or pick a chapter. All ${ML.chapters.reduce((s, c) => s + c.tools.length, 0)} solvers run in your browser.</p>
       <div class="card ask"><h2>Ask a question</h2><p class="desc">Type a question, or add a photo of it: use the button, drop a picture here, or copy a screenshot and paste it with Ctrl+V. Several questions can go in together, one per line.</p>
         <form id="askForm"><textarea id="askBox" rows="4" spellcheck="false" placeholder="For example:  ∫ (4 e^3x + 1) dx     or     Differentiate x^2 sin(3x)"></textarea>
-        <div class="actions"><button class="btn" type="submit">Solve</button><label class="btn ghost photoBtn">📷 Add a photo<input type="file" id="askPhoto" accept="image/*" hidden></label><button class="btn ghost" type="button" id="askClear">Clear</button></div>
+        <div class="actions"><button class="btn" type="submit">Solve</button><label class="btn ghost photoBtn camBtn">📸 Take a photo<input type="file" id="askCamera" accept="image/*" capture="environment" hidden></label><label class="btn ghost photoBtn">🖼️ Choose a picture<input type="file" id="askPhoto" accept="image/*" hidden></label><button class="btn ghost" type="button" id="askClear">Clear</button></div>
         <div id="photoRow" class="photoRow" hidden><img id="photoThumb" alt="The photo you added"><span id="photoStatus"></span></div></form>
         <div class="chips">Try: ${EX.map((e) => `<button type="button" class="chip">${esc(e)}</button>`).join("")}</div>
         <details class="help"><summary>Tips for pasting from a PDF</summary><p>Copying from the textbook PDF usually loses powers and fractions: $e^{3x}$ arrives as <code>e3x</code> or just <code>e</code>, and a fraction arrives as scattered lines. After pasting, check the line that starts with <b>Read as</b>. If it is not your question, fix the text: write powers with <code>^</code> (<code>x^2</code>, <code>e^(3x)</code>) and fractions with <code>/</code> and brackets, like <code>(x^3 + 5x^2 - 4)/x^2</code>.</p></details></div>
@@ -92,7 +92,7 @@
         else { st.innerHTML = "I have put what I could read into the box. <b>Check it against your photo</b> (powers, roots and fractions usually need fixing), then press <b>Solve</b>."; box.focus(); }
       } catch (e) { st.textContent = e && e.constructor === Error && e.message !== "load" ? e.message : "The photo reader could not start. Check your connection, or type the question."; }
     };
-    document.getElementById("askPhoto").addEventListener("change", (e) => { photo(e.target.files[0]); e.target.value = ""; });
+    ["askPhoto", "askCamera"].forEach((id) => document.getElementById(id).addEventListener("change", (e) => { if (e.target.files[0]) photo(e.target.files[0]); e.target.value = ""; }));
     const card = main.querySelector(".ask");
     card.addEventListener("paste", (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => /^image\//.test(x.type)); if (f) { e.preventDefault(); photo(f); } });
     card.addEventListener("dragover", (e) => e.preventDefault());
